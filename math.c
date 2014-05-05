@@ -32,7 +32,7 @@ int fop_open(struct inode* ip, struct file* fp)
     {
         pr_err("math: open command denied, "
             "max. users limit had been reached\n");
-        return -EINVAL;
+        return -EBUSY;
     }
 }
 
