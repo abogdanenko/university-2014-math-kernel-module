@@ -7,23 +7,41 @@
 
 #include "math.h"
 
+const int max_users = 6;
+
 struct math_device_t
 {
     struct cdev cdev;
     dev_t num;
+    atomic_t user_count;
 } math_device;
 
 int ret; // return code
 
 int fop_open(struct inode* ip, struct file* fp)
 {
-    pr_info("math: opened device\n");
-    return 0;
+    if(atomic_add_unless(&(math_device.user_count), 1, max_users))
+    {
+
+        pr_info("math: opened device\n");
+        pr_info("math: %d user(s) total\n",
+            atomic_read(&(math_device.user_count)));
+        return 0;
+    }
+    else
+    {
+        pr_err("math: open command denied, "
+            "max. users limit had been reached\n");
+        return -EINVAL;
+    }
 }
 
 int fop_release(struct inode* ip, struct file* fp)
 {
+    atomic_dec(&(math_device.user_count));
     pr_info("math: released device\n");
+    pr_info("math: %d user(s) total\n",
+        atomic_read(&(math_device.user_count)));
     return 0;
 }
 
@@ -59,6 +77,8 @@ static int math_init(void)
         pr_err("math: unable to add character device\n");
         return ret;
     }
+
+    atomic_set(&(math_device.user_count), 0);
 
     pr_info("math: loaded module\n");
     return 0;
