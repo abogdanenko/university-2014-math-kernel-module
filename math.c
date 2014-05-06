@@ -16,8 +16,6 @@ struct math_device_t
     atomic_t user_count;
 } math_device;
 
-int ret; // return code
-
 int fop_open(struct inode* ip, struct file* fp)
 {
     if(atomic_add_unless(&(math_device.user_count), 1, max_users))
@@ -45,9 +43,54 @@ int fop_release(struct inode* ip, struct file* fp)
     return 0;
 }
 
+int arity(unsigned cmd, int* result)
+{
+    switch (cmd)
+    {
+        case MATH_IOCTL_NEG:
+            *result = 1;
+            return 0;
+        case MATH_IOCTL_ADD:
+        case MATH_IOCTL_DIV:
+        case MATH_IOCTL_EXP:
+        case MATH_IOCTL_LOG:
+            *result = 2;
+            return 0;
+        default:
+            return -1;
+    }
+}
+
+int do_math(unsigned cmd, int* x)
+{
+    return 0;
+}
+
 long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
 {
-    pr_info("math: ioctl\n");
+    int ret;
+    int x[3];
+    int* x_user = (int*) arg;
+    int len;
+    
+    pr_info("math: ioctl begin\n");
+    ret = arity(cmd, &len);
+    if (ret)
+    {
+        pr_err("math: unknown operation code");
+        return -EINVAL;
+    }
+
+    ret = copy_from_user(x, x_user, len * sizeof(int));
+    ret = do_math(cmd, x);
+    if (ret)
+    {
+        pr_err("math: unable to compute requested mathematical operation");
+        return -EINVAL;
+    }
+    ret = copy_to_user(x_user + len, x + len, sizeof(int));
+
+    pr_info("math: ioctl end\n");
     return 0;
 }
 
@@ -61,6 +104,8 @@ struct file_operations fops =
 
 static int math_init(void)
 {
+    int ret;
+
     ret = alloc_chrdev_region(&(math_device.num), 0, 1, "math");
 
     if (ret < 0)
