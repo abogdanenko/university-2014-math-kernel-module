@@ -61,7 +61,7 @@ int arity(unsigned cmd, int* result)
     }
 }
 
-int neg(int a, int* c)
+int math_neg(int a, int* c)
 {
     if (a == INT_MIN)
     {
@@ -71,7 +71,7 @@ int neg(int a, int* c)
     return 0;
 }
 
-int add(int a, int b, int* c)
+int math_add(int a, int b, int* c)
 {
     if (a > 0 && b > 0)
     {
@@ -80,6 +80,7 @@ int add(int a, int b, int* c)
             return -1;
         }
     }
+
     if (a < 0 && b < 0)
     {
         if ((a - INT_MIN) + b < 0)
@@ -92,17 +93,22 @@ int add(int a, int b, int* c)
     return 0;
 }
 
-int div(int a, int b, int* c)
+int math_div(int a, int b, int* c)
+{
+    if (b == 0)
+    {
+        return -1;
+    }
+    *c = a / b;
+    return 0;
+}
+
+int math_exp(int a, int b, int* c)
 {
     return 0;
 }
 
-int exp(int a, int b, int* c)
-{
-    return 0;
-}
-
-int log(int a, int b, int* c)
+int math_log(int a, int b, int* c)
 {
     return 0;
 }
@@ -112,15 +118,15 @@ int do_math(unsigned cmd, int* x)
     switch (cmd)
     {
         case MATH_IOCTL_NEG:
-	    return neg(x[0], &(x[1]))
+            return math_neg(x[0], &(x[1]));
         case MATH_IOCTL_ADD:
-	    return add(x[0], x[1], &(x[2]))
+	    return math_add(x[0], x[1], &(x[2]));
         case MATH_IOCTL_DIV:
-	    return div(x[0], x[1], &(x[2]))
+	    return math_div(x[0], x[1], &(x[2]));
         case MATH_IOCTL_EXP:
-	    return exp(x[0], x[1], &(x[2]))
+	    return math_exp(x[0], x[1], &(x[2]));
         case MATH_IOCTL_LOG:
-	    return log(x[0], x[1], &(x[2]))
+	    return math_log(x[0], x[1], &(x[2]));
         default:
             return -1;
     }
