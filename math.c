@@ -7,6 +7,12 @@
 
 #include "math.h"
 
+enum math_err {
+    MATH_BAD_CMD = 1,
+    MATH_OVERFLOW,
+    MATH_ZERO_DIV
+};
+
 const int max_users = 6;
 
 struct math_device_t
@@ -57,7 +63,7 @@ int arity(unsigned cmd, int* result)
             *result = 2;
             return 0;
         default:
-            return -1;
+            return MATH_BAD_CMD;
     }
 }
 
@@ -65,7 +71,7 @@ int math_neg(int a, int* c)
 {
     if (a == INT_MIN)
     {
-        return -1;
+        return MATH_OVERFLOW;
     }
     *c = 0 - a;
     return 0;
@@ -77,7 +83,7 @@ int math_add(int a, int b, int* c)
     {
         if ((a - INT_MAX) + b > 0)
         {
-            return -1;
+            return MATH_OVERFLOW;
         }
     }
 
@@ -85,7 +91,7 @@ int math_add(int a, int b, int* c)
     {
         if ((a - INT_MIN) + b < 0)
         {
-            return -1;
+            return MATH_OVERFLOW;
         }
     }
 
@@ -97,7 +103,7 @@ int math_div(int a, int b, int* c)
 {
     if (b == 0)
     {
-        return -1;
+        return MATH_ZERO_DIV;
     }
     *c = a / b;
     return 0;
@@ -128,7 +134,7 @@ int do_math(unsigned cmd, int* x)
         case MATH_IOCTL_LOG:
 	    return math_log(x[0], x[1], &(x[2]));
         default:
-            return -1;
+            return MATH_BAD_CMD;
     }
 }
 
