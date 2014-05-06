@@ -61,9 +61,69 @@ int arity(unsigned cmd, int* result)
     }
 }
 
-int do_math(unsigned cmd, int* x)
+int neg(int a, int* c)
+{
+    if (a == INT_MIN)
+    {
+        return -1;
+    }
+    *c = 0 - a;
+    return 0;
+}
+
+int add(int a, int b, int* c)
+{
+    if (a > 0 && b > 0)
+    {
+        if ((a - INT_MAX) + b > 0)
+        {
+            return -1;
+        }
+    }
+    if (a < 0 && b < 0)
+    {
+        if ((a - INT_MIN) + b < 0)
+        {
+            return -1;
+        }
+    }
+
+    *c = a + b;
+    return 0;
+}
+
+int div(int a, int b, int* c)
 {
     return 0;
+}
+
+int exp(int a, int b, int* c)
+{
+    return 0;
+}
+
+int log(int a, int b, int* c)
+{
+    return 0;
+}
+
+int do_math(unsigned cmd, int* x)
+{
+    switch (cmd)
+    {
+        case MATH_IOCTL_NEG:
+	    return neg(x[0], &(x[1]))
+        case MATH_IOCTL_ADD:
+	    return add(x[0], x[1], &(x[2]))
+        case MATH_IOCTL_DIV:
+	    return div(x[0], x[1], &(x[2]))
+        case MATH_IOCTL_EXP:
+	    return exp(x[0], x[1], &(x[2]))
+        case MATH_IOCTL_LOG:
+	    return log(x[0], x[1], &(x[2]))
+        default:
+            return -1;
+    }
 }
 
 long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
@@ -72,20 +132,21 @@ long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
     int x[3];
     int* x_user = (int*) arg;
     int len;
-    
+
     pr_info("math: ioctl begin\n");
     ret = arity(cmd, &len);
     if (ret)
     {
-        pr_err("math: unknown operation code");
+        pr_err("math: unknown operation code\n");
         return -EINVAL;
     }
 
+    pr_info("math: requested operation %x\n", cmd);
     ret = copy_from_user(x, x_user, len * sizeof(int));
     ret = do_math(cmd, x);
     if (ret)
     {
-        pr_err("math: unable to compute requested mathematical operation");
+        pr_err("math: unable to compute requested mathematical operation\n");
         return -EINVAL;
     }
     ret = copy_to_user(x_user + len, x + len, sizeof(int));
