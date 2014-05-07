@@ -17,6 +17,28 @@ enum math_err
     MATH_ZERO_DIV
 };
 
+const char* math_err_name(int code)
+{
+    switch (code)
+    {
+        case MATH_BAD_CMD:
+            return "MATH_BAD_CMD";
+        case MATH_OVERFLOW:
+            return "MATH_OVERFLOW";
+        case MATH_UNDERFLOW:
+            return "MATH_UNDERFLOW";
+        case MATH_BAD_EXP:
+            return "MATH_BAD_EXP";
+        case MATH_BAD_LOG:
+            return "MATH_BAD_LOG";
+        case MATH_ZERO_DIV:
+            return "MATH_ZERO_DIV";
+        default:
+            return "UNKNOWN ERROR CODE"; // never happens
+    }
+    return "UNKNOWN ERROR CODE"; // never happens
+}
+
 const int max_users = 6;
 
 struct math_device_t
@@ -271,6 +293,7 @@ int math_exp(int a, int b, int* c)
         case 19:
             // case a > 1:
             return math_exp2(a, b, c);
+        //----------------------------------------------------------------------
         default:
             return MATH_BAD_EXP; // never happens
     }
@@ -388,6 +411,7 @@ long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
     if (ret)
     {
         pr_err("math: unable to compute requested mathematical operation\n");
+        pr_info("math: do_math returned error %s\n", math_err_name(ret));
         return -EINVAL;
     }
     ret = copy_to_user(x_user + len, x + len, sizeof(int));
