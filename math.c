@@ -111,7 +111,107 @@ int math_div(int a, int b, int* c)
 
 int math_exp(int a, int b, int* c)
 {
-    return 0;
+    int case_a;
+    int case_b;
+
+    if (a < -1)
+      case_a = 0;
+    else if (a == -1)
+      case_a = 1;
+    else if (a == 0)
+      case_a = 2;
+    else if (a == 1)
+      case_a = 3;
+    else
+      case_a = 4;
+
+    if (b < 0)
+      case_b = 0;
+    else if (b == 0)
+      case_b = 1;
+    else
+      case_b = 2;
+
+    switch (case_b * 5 + case_a)
+    {
+        // b < 0:
+        case 0:
+            return MATH_UNDERFLOW;
+        case 1:
+            if (b % 2)
+            {
+                *c = -1;
+                return 0;
+            }
+            // b is even:
+            *c = 1;
+            return 0;
+        case 2:
+            return MATH_BAD_EXP;
+        case 3:
+            *c = 1;
+            return 0;
+        case 4:
+            return MATH_UNDERFLOW;
+        // b == 0:
+        case 7:
+            return MATH_BAD_EXP;
+        case 5:
+        case 6:
+        case 8:
+        case 9:
+            *c = 1;
+            return 0;
+        // b > 0:
+        case 10:
+            if (b == 1)
+            {
+                *c = a;
+                return 0;
+            }
+
+            ret = neg(a, &abs_a);
+            if (ret)
+            {
+                return ret;
+            }
+            ret = math_exp2(abs_a, b, c);
+            if (ret)
+            {
+                return ret;
+            }
+            *c = 0 - *c;
+            return 0;
+        case 11:
+            if (b % 2)
+            {
+                *c = -1;
+                return 0;
+            }
+            else
+            {
+                *c = 1;
+                return 0;
+            }
+        case 12:
+            *c = 0;
+            return 0;
+        case 13:
+            *c = 1;
+            return 0;
+        case 14:
+            if (b == 1)
+            {
+                *c = a;
+                return 0;
+            }
+
+            return math_exp2(a, b, c);
+        default:
+            return MATH_BAD_EXP; // never happens
+    }
+
+    return MATH_BAD_EXP; // never happens
 }
 
 int math_log(int a, int b, int* c)
