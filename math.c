@@ -39,6 +39,27 @@ const char* math_err_name(int code)
     return "UNKNOWN ERROR CODE"; // never happens
 }
 
+const char* cmd_name(int cmd)
+{
+    switch (cmd)
+    {
+        case MATH_IOCTL_ADD:
+            return "MATH_IOCTL_ADD";
+        case MATH_IOCTL_NEG:
+            return "MATH_IOCTL_NEG";
+        case MATH_IOCTL_DIV:
+            return "MATH_IOCTL_DIV";
+        case MATH_IOCTL_EXP:
+            return "MATH_IOCTL_EXP";
+        case MATH_IOCTL_LOG:
+            return "MATH_IOCTL_LOG";
+        default:
+            return "UNKNOWN IOCTL";
+    }
+
+    return "UNKNOWN IOCTL"; //never happens
+}
+
 const int max_users = 6;
 
 struct math_device_t
@@ -405,7 +426,7 @@ long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
         return -EINVAL;
     }
 
-    pr_info("math: requested operation %x\n", cmd);
+    pr_info("math: requested operation %x (%s)\n", cmd, cmd_name(cmd));
     ret = copy_from_user(x, x_user, len * sizeof(int));
     ret = do_math(cmd, x);
     if (ret)
