@@ -10,7 +10,8 @@
 enum math_err {
     MATH_BAD_CMD = 1,
     MATH_OVERFLOW,
-    MATH_ZERO_DIV
+    MATH_ZERO_DIV,
+    MATH_BAD_EXP
 };
 
 const int max_users = 6;
@@ -109,8 +110,123 @@ int math_div(int a, int b, int* c)
     return 0;
 }
 
+// a >= 2, b >= 2
+int math_exp_pos_pow2(int a, int b, int* c)
+{
+    return 0;
+}
+
+int math_exp_neg_pow(int a, int b, int* c)
+{
+    if (a < -1 || a > 1)
+    {
+        return MATH_UNDERFLOW;
+    }
+
+    if (a == 0)
+    {
+        return MATH_BAD_EXP;
+    }
+
+    if (a == 1)
+    {
+        *c = 1;
+        return 0;
+    }
+
+    // a == -1:
+    if (b % 2)
+    {
+        *c = -1;
+        return 0;
+    }
+
+    // a == -1 and b is even:
+    *c = 1;
+    return 0;
+}
+
+int math_exp_pos_pow(int a, int b, int* c)
+{
+    int abs_a;
+    int ret;
+
+    if (b == 1)
+    {
+        *c = a;
+        return 0;
+    }
+
+    // b > 1:
+
+    if (a == 0)
+    {
+        *c = 0;
+        return 0;
+    }
+
+    if (a == -1)
+    {
+        if (b % 2)
+        {
+            *c = -1;
+            return 0;
+        }
+        else
+        {
+            *c = 1;
+            return 0;
+        }
+    }
+
+    if (a == 1)
+    {
+        *c = 1;
+        return 0;
+    }
+
+    if (a > 0)
+    {
+        return math_exp_pos_pow2(a, b, c);
+    }
+    
+    // a < 0, a != -1:
+
+    ret = neg(a, &abs_a);
+    if (ret)
+    {
+        return ret;
+    }
+    ret = math_exp_pos_pow2(abs_a, b, c);
+    if (ret)
+    {
+        return ret;
+    }
+    *c = 0 - *c;
+    return 0;
+}
+
 int math_exp(int a, int b, int* c)
 {
+    if (b > 0)
+    {
+        return math_exp_pos_pow(a, b, c);
+    }
+
+    if (b < 0)
+    {
+        return math_exp_neg_pow(a, b, c);
+    }
+
+    // b == 0:
+
+    if (a == 0)
+    {
+        return MATH_BAD_EXP;
+    }
+
+    // b == 0 and a != 0:
+    *c = 1;
     return 0;
 }
 
