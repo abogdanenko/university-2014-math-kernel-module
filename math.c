@@ -129,83 +129,108 @@ int math_exp(int a, int b, int* c)
       case_b = 0;
     else if (b == 0)
       case_b = 1;
-    else
+    else if (b == 1)
       case_b = 2;
+    else
+      case_b = 3;
 
     switch (case_b * 5 + case_a)
     {
-        // b < 0:
+        //----------------------------------------------------------------------
+        // case b < 0 (negative power):
         case 0:
+            // case a < -1:
+            // error: the result is less then 1 in absolute value, not integer
             return MATH_UNDERFLOW;
         case 1:
+            // case a == -1:
+            // if the power is odd, the result is -1, otherwise the result is 1
             if (b % 2)
             {
                 *c = -1;
                 return 0;
             }
-            // b is even:
             *c = 1;
             return 0;
         case 2:
+            // case a == 0:
+            // error: zero to negative power
             return MATH_BAD_EXP;
         case 3:
+            // case a == 1:
+            // one to negative power is one
             *c = 1;
             return 0;
         case 4:
+            // case a > 1:
+            // error: the result is less then 1 in absolute value, not integer
             return MATH_UNDERFLOW;
-        // b == 0:
+        //----------------------------------------------------------------------
+        // case b == 0 (power zero):
         case 7:
+            // case a == 0:
+            // error: zero to the power of zero
             return MATH_BAD_EXP;
         case 5:
         case 6:
         case 8:
         case 9:
+            // case a != 0:
+            // non-zero to the power of zero
             *c = 1;
             return 0;
-        // b > 0:
+        //----------------------------------------------------------------------
+        // case b == 1 (power one):
+        // the result equals the base
         case 10:
-            if (b == 1)
-            {
-                *c = a;
-                return 0;
-            }
-
+        case 11:
+        case 12:
+        case 13:
+        case 14:
+            *c = a;
+            return 0;
+        //----------------------------------------------------------------------
+        // case b > 1 (positive power greater than 1):
+        case 15:
+            // case a < -1:
+            // reduce it to case a > 1
+            // negate the base, then, if the power is odd, negate the result
             ret = neg(a, &abs_a);
             if (ret)
             {
                 return ret;
             }
             ret = math_exp2(abs_a, b, c);
+
             if (ret)
             {
                 return ret;
             }
-            *c = 0 - *c;
+
+            if (b % 2)
+            {
+                *c = 0 - *c;
+            }
+
             return 0;
-        case 11:
+        case 16:
+            // case a == -1:
+            // if the power is odd, the result is -1, otherwise the result is 1
             if (b % 2)
             {
                 *c = -1;
                 return 0;
             }
-            else
-            {
-                *c = 1;
-                return 0;
-            }
-        case 12:
-            *c = 0;
-            return 0;
-        case 13:
             *c = 1;
             return 0;
-        case 14:
-            if (b == 1)
-            {
-                *c = a;
-                return 0;
-            }
-
+        case 17:
+        case 18:
+            // case a == 0 or a == 1:
+            // zero or one to the positive power stays the same
+            *c = a;
+            return 0;
+        case 19:
+            // case a > 1:
             return math_exp2(a, b, c);
         default:
             return MATH_BAD_EXP; // never happens
