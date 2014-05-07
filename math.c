@@ -7,11 +7,13 @@
 
 #include "math.h"
 
-enum math_err {
+enum math_err
+{
     MATH_BAD_CMD = 1,
     MATH_OVERFLOW,
     MATH_UNDERFLOW,
     MATH_BAD_EXP,
+    MATH_BAD_LOG,
     MATH_ZERO_DIV
 };
 
@@ -278,6 +280,71 @@ int math_exp(int a, int b, int* c)
 
 int math_log(int a, int b, int* c)
 {
+    int p;
+    int k;
+    int ret;
+
+    if (a <= 0)
+    {
+        return MATH_BAD_LOG;
+    }
+
+    if (b <= 1)
+    {
+        return MATH_BAD_LOG;
+    }
+
+    if (a == 1)
+    {
+        *c = 0;
+        return 0;
+    }
+
+    // we now have a > 1 and b > 1
+
+    if (a < b)
+    {
+        *c = 0;
+        return 0;
+    }
+
+    if (a == b)
+    {
+        *c = 1;
+        return 0;
+    }
+
+    // we now have 1 < b < a (<= INT_MAX)
+
+    // algorithm: compute p == b ** k, (k = 2, 3, ...) using multiplication
+    // the logarithm is the largest k such that p <= a
+
+    p = b; // product
+    k = 1; // power (result)
+    // loop invariant: p == b ** k
+    do
+    {
+        ret = math_mul(p, b, &p);
+        if (ret == 0)
+        {
+            k++;
+        }
+    }
+    while (ret == 0 && p <= a);
+
+    if (ret)
+    {
+        // b ** k == p <= a (previous loop condition or before cycle condition)
+        // b ** (k + 1) > INT_MAX >= a
+        *c = k;
+    }
+    else
+    {
+        // b ** (k - 1) <= a (previous loop condition or before cycle condition)
+        // b ** k == p > a
+        *c = k - 1;
+    }
+
     return 0;
 }
 
