@@ -10,6 +10,8 @@
 enum math_err {
     MATH_BAD_CMD = 1,
     MATH_OVERFLOW,
+    MATH_UNDERFLOW,
+    MATH_BAD_EXP,
     MATH_ZERO_DIV
 };
 
@@ -109,8 +111,43 @@ int math_div(int a, int b, int* c)
     return 0;
 }
 
+// a > 1, b > 1
+int math_mul(int a, int b, int*c)
+{
+    if (b > INT_MAX / a)
+    {
+        return MATH_OVERFLOW;
+    }
+    *c = a * b;
+    return 0;
+}
+
+// a > 1, b > 1
+int math_exp2(int a, int b, int* c)
+{
+    // use simple multiplication
+    // result = a * a * ... * a (b times)
+    int i;
+    int p = a; // product
+    int ret;
+
+    for (i = 0; i < b - 1; i++)
+    {
+        // compute p *= a, check for overflow
+        ret = math_mul(a, p, &p);
+        if (ret)
+        {
+            return ret;
+        }
+    }   
+
+    *c = p;
+    return 0;
+}
+
 int math_exp(int a, int b, int* c)
 {
+    int ret;
     int case_a;
     int case_b;
 
@@ -195,12 +232,12 @@ int math_exp(int a, int b, int* c)
             // case a < -1:
             // reduce it to case a > 1
             // negate the base, then, if the power is odd, negate the result
-            ret = neg(a, &abs_a);
-            if (ret)
+            if (a == INT_MIN)
             {
-                return ret;
+                return MATH_OVERFLOW;
             }
-            ret = math_exp2(abs_a, b, c);
+
+            ret = math_exp2(0 - a, b, c);
 
             if (ret)
             {
