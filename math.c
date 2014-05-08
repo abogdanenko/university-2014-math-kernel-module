@@ -1,3 +1,11 @@
+/*
+ * math character device by Alexey Bogdanenko <alexey@bogdanenko.com>
+ *
+ * Loadable kernel module that provides simple integer math functionality
+ * through ioctl syscall interface.
+ * 
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -6,6 +14,9 @@
 #include <linux/cdev.h>
 
 #include "math.h"
+
+//-----------------------------------------------------------------------------
+// TYPES
 
 enum math_err
 {
@@ -17,7 +28,63 @@ enum math_err
     MATH_ZERO_DIV
 };
 
-const char* math_err_name(int code)
+struct math_device_t
+{
+    struct cdev cdev;
+    dev_t num;
+    atomic_t user_count;
+};
+
+//-----------------------------------------------------------------------------
+// FUNCTION PROTOTYPES
+
+static int math_init(void);
+static void math_exit(void);
+
+static int fop_open(struct inode*, struct file*);
+static int fop_release(struct inode*, struct file*);
+static long fop_unlocked_ioctl(struct file*, unsigned int, unsigned long);
+
+static int do_math(unsigned, int*);
+
+static int arity(unsigned, int*);
+static int math_neg(int, int*);
+static int math_add(int, int, int*);
+static int math_div(int, int, int*);
+static int math_mul(int, int, int*);
+static int math_exp2(int, int, int*);
+static int math_exp(int, int, int*);
+static int math_log(int, int, int*);
+
+static const char* math_err_name(int);
+static const char* cmd_name(int);
+//-----------------------------------------------------------------------------
+// GLOBAL VARIABLES
+
+static const int max_users = 6;
+struct math_device_t math_device;
+struct file_operations fops = 
+{
+    .owner = THIS_MODULE,
+    .open = fop_open,
+    .release = fop_release,
+    .unlocked_ioctl = fop_unlocked_ioctl
+};
+
+//-----------------------------------------------------------------------------
+// MODULE MACROS
+
+module_init(math_init);
+module_exit(math_exit);
+
+MODULE_AUTHOR("Alexey Bogdanenko <alexey@bogdanenko.com>");
+MODULE_DESCRIPTION("Math module");
+MODULE_LICENSE("GPL");
+
+//-----------------------------------------------------------------------------
+// IMPLEMENTATION
+
+static const char* math_err_name(int code)
 {
     switch (code)
     {
@@ -39,7 +106,7 @@ const char* math_err_name(int code)
     return "UNKNOWN ERROR CODE"; // never happens
 }
 
-const char* cmd_name(int cmd)
+static const char* cmd_name(int cmd)
 {
     switch (cmd)
     {
@@ -60,16 +127,7 @@ const char* cmd_name(int cmd)
     return "UNKNOWN IOCTL"; //never happens
 }
 
-const int max_users = 6;
-
-struct math_device_t
-{
-    struct cdev cdev;
-    dev_t num;
-    atomic_t user_count;
-} math_device;
-
-int fop_open(struct inode* ip, struct file* fp)
+static int fop_open(struct inode* ip, struct file* fp)
 {
     if(atomic_add_unless(&(math_device.user_count), 1, max_users))
     {
@@ -87,7 +145,7 @@ int fop_open(struct inode* ip, struct file* fp)
     }
 }
 
-int fop_release(struct inode* ip, struct file* fp)
+static int fop_release(struct inode* ip, struct file* fp)
 {
     atomic_dec(&(math_device.user_count));
     pr_info("math: released device\n");
@@ -96,7 +154,7 @@ int fop_release(struct inode* ip, struct file* fp)
     return 0;
 }
 
-int arity(unsigned cmd, int* result)
+static int arity(unsigned cmd, int* result)
 {
     switch (cmd)
     {
@@ -114,7 +172,7 @@ int arity(unsigned cmd, int* result)
     }
 }
 
-int math_neg(int a, int* c)
+static int math_neg(int a, int* c)
 {
     if (a == INT_MIN)
     {
@@ -124,7 +182,7 @@ int math_neg(int a, int* c)
     return 0;
 }
 
-int math_add(int a, int b, int* c)
+static int math_add(int a, int b, int* c)
 {
     if (a > 0 && b > 0)
     {
@@ -146,7 +204,7 @@ int math_add(int a, int b, int* c)
     return 0;
 }
 
-int math_div(int a, int b, int* c)
+static int math_div(int a, int b, int* c)
 {
     if (b == 0)
     {
@@ -157,7 +215,7 @@ int math_div(int a, int b, int* c)
 }
 
 // a > 1, b > 1
-int math_mul(int a, int b, int*c)
+static int math_mul(int a, int b, int*c)
 {
     if (b > INT_MAX / a)
     {
@@ -168,7 +226,7 @@ int math_mul(int a, int b, int*c)
 }
 
 // a > 1, b > 1
-int math_exp2(int a, int b, int* c)
+static int math_exp2(int a, int b, int* c)
 {
     // use simple multiplication
     // result = a * a * ... * a (b times)
@@ -190,7 +248,7 @@ int math_exp2(int a, int b, int* c)
     return 0;
 }
 
-int math_exp(int a, int b, int* c)
+static int math_exp(int a, int b, int* c)
 {
     int ret;
     int case_a;
@@ -322,7 +380,7 @@ int math_exp(int a, int b, int* c)
     return MATH_BAD_EXP; // never happens
 }
 
-int math_log(int a, int b, int* c)
+static int math_log(int a, int b, int* c)
 {
     int p;
     int k;
@@ -392,7 +450,7 @@ int math_log(int a, int b, int* c)
     return 0;
 }
 
-int do_math(unsigned cmd, int* x)
+static int do_math(unsigned cmd, int* x)
 {
     switch (cmd)
     {
@@ -411,7 +469,7 @@ int do_math(unsigned cmd, int* x)
     }
 }
 
-long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
+static long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
 {
     int ret;
     int x[3];
@@ -440,14 +498,6 @@ long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
     pr_info("math: ioctl end\n");
     return 0;
 }
-
-struct file_operations fops = 
-{
-    .owner = THIS_MODULE,
-    .open = fop_open,
-    .release = fop_release,
-    .unlocked_ioctl = fop_unlocked_ioctl
-};
 
 static int math_init(void)
 {
@@ -482,9 +532,3 @@ static void math_exit(void)
     pr_info("math: unloaded module\n");
 }
 
-module_init(math_init);
-module_exit(math_exit);
-
-MODULE_AUTHOR("Alexey Bogdanenko <alexey@bogdanenko.com>");
-MODULE_DESCRIPTION("Math module");
-MODULE_LICENSE("GPL");
