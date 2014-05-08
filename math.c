@@ -63,14 +63,6 @@ static const char* cmd_name(int);
 /* GLOBAL VARIABLES */
 
 static struct math_device_t math_device;
-static struct file_operations fops = 
-{
-    .owner = THIS_MODULE,
-    .open = fop_open,
-    .release = fop_release,
-    .unlocked_ioctl = fop_unlocked_ioctl
-};
-
 /*****************************************************************************/
 /* MODULE MACROS */
 
@@ -510,6 +502,14 @@ static long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long 
 static int math_init(void)
 {
     int ret;
+
+    static struct file_operations fops =
+    {
+        .owner = THIS_MODULE,
+        .open = fop_open,
+        .release = fop_release,
+        .unlocked_ioctl = fop_unlocked_ioctl
+    };
 
     math_device.max_users = 6;
     atomic_set(&(math_device.user_count), 0);
