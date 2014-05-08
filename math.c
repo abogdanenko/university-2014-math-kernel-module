@@ -476,7 +476,6 @@ static long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long 
     int* x_user = (int*) arg;
     int len;
 
-    pr_info("math: ioctl begin\n");
     ret = arity(cmd, &len);
     if (ret)
     {
@@ -495,7 +494,6 @@ static long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long 
     }
     ret = copy_to_user(x_user + len, x + len, sizeof(int));
 
-    pr_info("math: ioctl end\n");
     return 0;
 }
 
