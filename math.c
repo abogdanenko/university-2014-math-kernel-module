@@ -33,6 +33,7 @@ struct math_device_t
     struct cdev cdev;
     dev_t num;
     atomic_t user_count;
+    int max_users;
 };
 
 /*****************************************************************************/
@@ -61,7 +62,6 @@ static const char* cmd_name(int);
 /*****************************************************************************/
 /* GLOBAL VARIABLES */
 
-static const int max_users = 6;
 static struct math_device_t math_device;
 static struct file_operations fops = 
 {
@@ -129,7 +129,7 @@ static const char* cmd_name(int cmd)
 
 static int fop_open(struct inode* ip, struct file* fp)
 {
-    if(atomic_add_unless(&(math_device.user_count), 1, max_users))
+    if (atomic_add_unless(&(math_device.user_count), 1, math_device.max_users))
     {
 
         pr_info("math: opened device\n");
@@ -137,12 +137,10 @@ static int fop_open(struct inode* ip, struct file* fp)
             atomic_read(&(math_device.user_count)));
         return 0;
     }
-    else
-    {
-        pr_err("math: open command denied, "
-            "max. users limit had been reached\n");
-        return -EBUSY;
-    }
+
+    pr_err("math: open command denied, "
+        "max. users limit had been reached\n");
+    return -EBUSY;
 }
 
 static int fop_release(struct inode* ip, struct file* fp)
@@ -513,6 +511,9 @@ static int math_init(void)
 {
     int ret;
 
+    math_device.max_users = 6;
+    atomic_set(&(math_device.user_count), 0);
+
     ret = alloc_chrdev_region(&(math_device.num), 0, 1, "math");
 
     if (ret < 0)
@@ -530,7 +531,6 @@ static int math_init(void)
         return ret;
     }
 
-    atomic_set(&(math_device.user_count), 0);
 
     pr_info("math: loaded module\n");
     return 0;
