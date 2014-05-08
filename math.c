@@ -15,8 +15,8 @@
 
 #include "math.h"
 
-//-----------------------------------------------------------------------------
-// TYPES
+/*****************************************************************************/
+/* TYPES */
 
 enum math_err
 {
@@ -35,8 +35,8 @@ struct math_device_t
     atomic_t user_count;
 };
 
-//-----------------------------------------------------------------------------
-// FUNCTION PROTOTYPES
+/*****************************************************************************/
+/* FUNCTION PROTOTYPES */
 
 static int math_init(void);
 static void math_exit(void);
@@ -58,12 +58,12 @@ static int math_log(int, int, int*);
 
 static const char* math_err_name(int);
 static const char* cmd_name(int);
-//-----------------------------------------------------------------------------
-// GLOBAL VARIABLES
+/*****************************************************************************/
+/* GLOBAL VARIABLES */
 
 static const int max_users = 6;
-struct math_device_t math_device;
-struct file_operations fops = 
+static struct math_device_t math_device;
+static struct file_operations fops = 
 {
     .owner = THIS_MODULE,
     .open = fop_open,
@@ -71,8 +71,8 @@ struct file_operations fops =
     .unlocked_ioctl = fop_unlocked_ioctl
 };
 
-//-----------------------------------------------------------------------------
-// MODULE MACROS
+/*****************************************************************************/
+/* MODULE MACROS */
 
 module_init(math_init);
 module_exit(math_exit);
@@ -81,8 +81,8 @@ MODULE_AUTHOR("Alexey Bogdanenko <alexey@bogdanenko.com>");
 MODULE_DESCRIPTION("Math module");
 MODULE_LICENSE("GPL");
 
-//-----------------------------------------------------------------------------
-// IMPLEMENTATION
+/*****************************************************************************/
+/* IMPLEMENTATION */
 
 static const char* math_err_name(int code)
 {
@@ -101,9 +101,9 @@ static const char* math_err_name(int code)
         case MATH_ZERO_DIV:
             return "MATH_ZERO_DIV";
         default:
-            return "UNKNOWN ERROR CODE"; // never happens
+            return "UNKNOWN ERROR CODE"; /* never happens */
     }
-    return "UNKNOWN ERROR CODE"; // never happens
+    return "UNKNOWN ERROR CODE"; /* never happens */
 }
 
 static const char* cmd_name(int cmd)
@@ -124,7 +124,7 @@ static const char* cmd_name(int cmd)
             return "UNKNOWN IOCTL";
     }
 
-    return "UNKNOWN IOCTL"; //never happens
+    return "UNKNOWN IOCTL"; /* never happens */
 }
 
 static int fop_open(struct inode* ip, struct file* fp)
@@ -214,7 +214,7 @@ static int math_div(int a, int b, int* c)
     return 0;
 }
 
-// a > 1, b > 1
+/* a > 1, b > 1 */
 static int math_mul(int a, int b, int*c)
 {
     if (b > INT_MAX / a)
@@ -225,18 +225,20 @@ static int math_mul(int a, int b, int*c)
     return 0;
 }
 
-// a > 1, b > 1
+/* a > 1, b > 1 */
 static int math_exp2(int a, int b, int* c)
 {
-    // use simple multiplication
-    // result = a * a * ... * a (b times)
+    /* 
+     * use simple multiplication
+     * result = a * a * ... * a (b times)
+     */
     int i;
-    int p = a; // product
+    int p = a; /* product */
     int ret;
 
     for (i = 0; i < b - 1; i++)
     {
-        // compute p *= a, check for overflow
+        /* compute p *= a, check for overflow */
         ret = math_mul(a, p, &p);
         if (ret)
         {
@@ -276,15 +278,15 @@ static int math_exp(int a, int b, int* c)
 
     switch (case_b * 5 + case_a)
     {
-        //----------------------------------------------------------------------
-        // case b < 0 (negative power):
+        /*********************************************************************/
+        /* case b < 0 (negative power): */
         case 0:
-            // case a < -1:
-            // error: the result is less then 1 in absolute value, not integer
+            /* case a < -1: */
+            /* error: the result is less then 1 in absolute value, not int. */
             return MATH_UNDERFLOW;
         case 1:
-            // case a == -1:
-            // if the power is odd, the result is -1, otherwise the result is 1
+            /* case a == -1: */
+            /* if the power is odd, the res. is -1, otherwise the res. is 1 */
             if (b % 2)
             {
                 *c = -1;
@@ -293,35 +295,35 @@ static int math_exp(int a, int b, int* c)
             *c = 1;
             return 0;
         case 2:
-            // case a == 0:
-            // error: zero to negative power
+            /* case a == 0: */
+            /* error: zero to negative power */
             return MATH_BAD_EXP;
         case 3:
-            // case a == 1:
-            // one to negative power is one
+            /* case a == 1: */
+            /* one to negative power is one */
             *c = 1;
             return 0;
         case 4:
-            // case a > 1:
-            // error: the result is less then 1 in absolute value, not integer
+            /* case a > 1: */
+            /* error: the result is less then 1 in absolute value, not int. */
             return MATH_UNDERFLOW;
-        //----------------------------------------------------------------------
-        // case b == 0 (power zero):
+        /*********************************************************************/
+        /* case b == 0 (power zero): */
         case 7:
-            // case a == 0:
-            // error: zero to the power of zero
+            /* case a == 0: */
+            /* error: zero to the power of zero */
             return MATH_BAD_EXP;
         case 5:
         case 6:
         case 8:
         case 9:
-            // case a != 0:
-            // non-zero to the power of zero
+            /* case a != 0: */
+            /* non-zero to the power of zero */
             *c = 1;
             return 0;
-        //----------------------------------------------------------------------
-        // case b == 1 (power one):
-        // the result equals the base
+        /*********************************************************************/
+        /* case b == 1 (power one): */
+        /* the result equals the base */
         case 10:
         case 11:
         case 12:
@@ -329,12 +331,14 @@ static int math_exp(int a, int b, int* c)
         case 14:
             *c = a;
             return 0;
-        //----------------------------------------------------------------------
-        // case b > 1 (positive power greater than 1):
+        /*********************************************************************/
+        /* case b > 1 (positive power greater than 1): */
         case 15:
-            // case a < -1:
-            // reduce it to case a > 1
-            // negate the base, then, if the power is odd, negate the result
+            /* case a < -1: */
+            /*
+             * reduce it to case a > 1
+             * negate the base, then, if the power is odd, negate the result
+             */
             if (a == INT_MIN)
             {
                 return MATH_OVERFLOW;
@@ -354,8 +358,8 @@ static int math_exp(int a, int b, int* c)
 
             return 0;
         case 16:
-            // case a == -1:
-            // if the power is odd, the result is -1, otherwise the result is 1
+            /* case a == -1: */
+            /* if the power is odd, the res. is -1, otherwise the res. is 1 */
             if (b % 2)
             {
                 *c = -1;
@@ -365,19 +369,19 @@ static int math_exp(int a, int b, int* c)
             return 0;
         case 17:
         case 18:
-            // case a == 0 or a == 1:
-            // zero or one to the positive power stays the same
+            /* case a == 0 or a == 1: */
+            /* zero or one to the positive power stays the same */
             *c = a;
             return 0;
         case 19:
-            // case a > 1:
+            /* case a > 1: */
             return math_exp2(a, b, c);
-        //----------------------------------------------------------------------
+        /*********************************************************************/
         default:
-            return MATH_BAD_EXP; // never happens
+            return MATH_BAD_EXP; /* never happens */
     }
 
-    return MATH_BAD_EXP; // never happens
+    return MATH_BAD_EXP; /* never happens */
 }
 
 static int math_log(int a, int b, int* c)
@@ -402,7 +406,7 @@ static int math_log(int a, int b, int* c)
         return 0;
     }
 
-    // we now have a > 1 and b > 1
+    /* we now have a > 1 and b > 1 */
 
     if (a < b)
     {
@@ -416,14 +420,16 @@ static int math_log(int a, int b, int* c)
         return 0;
     }
 
-    // we now have 1 < b < a (<= INT_MAX)
+    /* we now have 1 < b < a (<= INT_MAX) */
 
-    // algorithm: compute p == b ** k, (k = 2, 3, ...) using multiplication
-    // the logarithm is the largest k such that p <= a
+    /*
+     * algorithm: compute p == b ** k, (k = 2, 3, ...) using multiplication
+     * the logarithm is the largest k such that p <= a
+     */
 
-    p = b; // product
-    k = 1; // power (result)
-    // loop invariant: p == b ** k
+    p = b; /* product */
+    k = 1; /* power (result) */
+    /* loop invariant: p == b ** k */
     do
     {
         ret = math_mul(p, b, &p);
@@ -436,14 +442,18 @@ static int math_log(int a, int b, int* c)
 
     if (ret)
     {
-        // b ** k == p <= a (previous loop condition or before cycle condition)
-        // b ** (k + 1) > INT_MAX >= a
+        /*
+         * b ** k == p <= a (previous loop condition or before cycle condition)
+         * b ** (k + 1) > INT_MAX >= a
+         */
         *c = k;
     }
     else
     {
-        // b ** (k - 1) <= a (previous loop condition or before cycle condition)
-        // b ** k == p > a
+        /*
+         * b ** (k - 1) <= a (previous loop condition or before cycle condition)
+         * b ** k == p > a
+         */
         *c = k - 1;
     }
 
