@@ -30,7 +30,7 @@ enum math_err
 
 struct math_device_t
 {
-    struct cdev cdev;
+    struct cdev* cdev;
     dev_t num;
     atomic_t user_count;
     int max_users;
@@ -520,8 +520,17 @@ static int math_init(void)
         return ret;
     }
 
-    cdev_init(&(math_device.cdev), &fops);
-    ret = cdev_add(&(math_device.cdev), math_device.num, 1);
+    math_device.cdev = cdev_alloc();
+    if (math_device.cdev == NULL)
+    {
+        pr_err("math: failed to allocate a cdev\n");
+        unregister_chrdev_region(math_device.num, 1);
+        return -1;
+    }
+
+    cdev_init(math_device.cdev, &fops);
+    math_device.cdev->owner = THIS_MODULE;
+    ret = cdev_add(math_device.cdev, math_device.num, 1);
     
     if (ret < 0)
     {
@@ -536,6 +545,7 @@ static int math_init(void)
 
 static void math_exit(void)
 {
+    cdev_del(math_device.cdev);
     unregister_chrdev_region(math_device.num, 1);
     pr_info("math: unloaded module\n");
 }
