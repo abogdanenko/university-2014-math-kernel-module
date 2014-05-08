@@ -3,7 +3,7 @@
  *
  * Loadable kernel module that provides simple integer math functionality
  * through ioctl syscall interface.
- * 
+ *
  */
 
 #include <linux/kernel.h>
@@ -39,25 +39,62 @@ struct math_device_t
 /*****************************************************************************/
 /* FUNCTION PROTOTYPES */
 
+/* initialises module */
 static int math_init(void);
+
+/* frees resources */
 static void math_exit(void);
 
+/* enforces user limit when user attempts to open the device */
 static int fop_open(struct inode*, struct file*);
-static int fop_release(struct inode*, struct file*);
-static long fop_unlocked_ioctl(struct file*, unsigned int, unsigned long);
 
+/* decrements user counter */
+static int fop_release(struct inode*, struct file*);
+
+/* moves data between kernel and user space, calls do_math to do its job */
+static long fop_unlocked_ioctl(
+    struct file*,
+    unsigned int,
+    unsigned long);
+
+/* calls specific math function depending on command */
 static int do_math(unsigned, int*);
 
+/* gives number of arguments of specific mathematical operation */
 static int arity(unsigned, int*);
+
+/* negates the first argument, checks for overflows */
 static int math_neg(int, int*);
+
+/* computes the sum of the first two arguments, checks for overflow */
 static int math_add(int, int, int*);
+
+/* divides first argument by second, checks for zero division */
 static int math_div(int, int, int*);
+
+/* computes the product of the first two arguments, checks for overflow  */
 static int math_mul(int, int, int*);
+
+/*
+ * Raises the first argument to the power of the second argument.
+ * Works only in special case (base > 1, exp > 1). Checks for overflow
+ */
 static int math_exp2(int, int, int*);
+
+/*
+ * Raises the first argument to the power of the second argument, checks for
+ * bad input, overflows etc.
+ *
+ */
 static int math_exp(int, int, int*);
+
+/* computes the logarithm of the first argument, base = second argument */
 static int math_log(int, int, int*);
 
+/* returns the name of error, error number should be from enum math_err */
 static const char* math_err_name(int);
+
+/* returns ioctl command name */
 static const char* cmd_name(int);
 /*****************************************************************************/
 /* GLOBAL VARIABLES */
@@ -76,47 +113,56 @@ MODULE_LICENSE("GPL");
 /*****************************************************************************/
 /* IMPLEMENTATION */
 
-static const char* math_err_name(int code)
+static int math_init(void)
 {
-    switch (code)
+    int ret;
+
+    static struct file_operations fops =
     {
-        case MATH_BAD_CMD:
-            return "MATH_BAD_CMD";
-        case MATH_OVERFLOW:
-            return "MATH_OVERFLOW";
-        case MATH_UNDERFLOW:
-            return "MATH_UNDERFLOW";
-        case MATH_BAD_EXP:
-            return "MATH_BAD_EXP";
-        case MATH_BAD_LOG:
-            return "MATH_BAD_LOG";
-        case MATH_ZERO_DIV:
-            return "MATH_ZERO_DIV";
-        default:
-            return "UNKNOWN ERROR CODE"; /* never happens */
+        .owner = THIS_MODULE,
+        .open = fop_open,
+        .release = fop_release,
+        .unlocked_ioctl = fop_unlocked_ioctl
+    };
+
+    math_device.max_users = 6;
+    atomic_set(&(math_device.user_count), 0);
+
+    ret = alloc_chrdev_region(&(math_device.num), 0, 1, "math");
+
+    if (ret < 0)
+    {
+        pr_err("math: failed to allocate device number\n");
+        return ret;
     }
-    return "UNKNOWN ERROR CODE"; /* never happens */
+
+    math_device.cdev = cdev_alloc();
+    if (math_device.cdev == NULL)
+    {
+        pr_err("math: failed to allocate a cdev\n");
+        unregister_chrdev_region(math_device.num, 1);
+        return -1;
+    }
+
+    cdev_init(math_device.cdev, &fops);
+    math_device.cdev->owner = THIS_MODULE;
+    ret = cdev_add(math_device.cdev, math_device.num, 1);
+
+    if (ret < 0)
+    {
+        pr_err("math: unable to add character device\n");
+        return ret;
+    }
+
+    pr_info("math: loaded module\n");
+    return 0;
 }
 
-static const char* cmd_name(int cmd)
+static void math_exit(void)
 {
-    switch (cmd)
-    {
-        case MATH_IOCTL_ADD:
-            return "MATH_IOCTL_ADD";
-        case MATH_IOCTL_NEG:
-            return "MATH_IOCTL_NEG";
-        case MATH_IOCTL_DIV:
-            return "MATH_IOCTL_DIV";
-        case MATH_IOCTL_EXP:
-            return "MATH_IOCTL_EXP";
-        case MATH_IOCTL_LOG:
-            return "MATH_IOCTL_LOG";
-        default:
-            return "UNKNOWN IOCTL";
-    }
-
-    return "UNKNOWN IOCTL"; /* never happens */
+    cdev_del(math_device.cdev);
+    unregister_chrdev_region(math_device.num, 1);
+    pr_info("math: unloaded module\n");
 }
 
 static int fop_open(struct inode* ip, struct file* fp)
@@ -142,6 +188,56 @@ static int fop_release(struct inode* ip, struct file* fp)
     pr_info("math: %d user(s) total\n",
         atomic_read(&(math_device.user_count)));
     return 0;
+}
+
+static long fop_unlocked_ioctl(
+    struct file* fp,
+    unsigned int cmd,
+    unsigned long arg)
+{
+    int ret;
+    int x[3];
+    int* x_user = (int*) arg;
+    int len;
+
+    ret = arity(cmd, &len);
+    if (ret)
+    {
+        pr_err("math: unknown operation code\n");
+        return -EINVAL;
+    }
+
+    pr_info("math: requested operation %x (%s)\n", cmd, cmd_name(cmd));
+    ret = copy_from_user(x, x_user, len * sizeof(int));
+    ret = do_math(cmd, x);
+    if (ret)
+    {
+        pr_err("math: unable to compute requested mathematical operation\n");
+        pr_info("math: do_math returned error %s\n", math_err_name(ret));
+        return -EINVAL;
+    }
+    ret = copy_to_user(x_user + len, x + len, sizeof(int));
+
+    return 0;
+}
+
+static int do_math(unsigned cmd, int* x)
+{
+    switch (cmd)
+    {
+        case MATH_IOCTL_NEG:
+            return math_neg(x[0], &(x[1]));
+        case MATH_IOCTL_ADD:
+            return math_add(x[0], x[1], &(x[2]));
+        case MATH_IOCTL_DIV:
+            return math_div(x[0], x[1], &(x[2]));
+        case MATH_IOCTL_EXP:
+            return math_exp(x[0], x[1], &(x[2]));
+        case MATH_IOCTL_LOG:
+            return math_log(x[0], x[1], &(x[2]));
+        default:
+            return MATH_BAD_CMD;
+    }
 }
 
 static int arity(unsigned cmd, int* result)
@@ -218,7 +314,7 @@ static int math_mul(int a, int b, int*c)
 /* a > 1, b > 1 */
 static int math_exp2(int a, int b, int* c)
 {
-    /* 
+    /*
      * use simple multiplication
      * result = a * a * ... * a (b times)
      */
@@ -234,7 +330,7 @@ static int math_exp2(int a, int b, int* c)
         {
             return ret;
         }
-    }   
+    }
 
     *c = p;
     return 0;
@@ -441,7 +537,7 @@ static int math_log(int a, int b, int* c)
     else
     {
         /*
-         * b ** (k - 1) <= a (previous loop condition or before cycle condition)
+         * b ** (k - 1) <= a (prev. loop condition or before cycle condition)
          * b ** k == p > a
          */
         *c = k - 1;
@@ -450,103 +546,45 @@ static int math_log(int a, int b, int* c)
     return 0;
 }
 
-static int do_math(unsigned cmd, int* x)
+static const char* math_err_name(int code)
+{
+    switch (code)
+    {
+        case MATH_BAD_CMD:
+            return "MATH_BAD_CMD";
+        case MATH_OVERFLOW:
+            return "MATH_OVERFLOW";
+        case MATH_UNDERFLOW:
+            return "MATH_UNDERFLOW";
+        case MATH_BAD_EXP:
+            return "MATH_BAD_EXP";
+        case MATH_BAD_LOG:
+            return "MATH_BAD_LOG";
+        case MATH_ZERO_DIV:
+            return "MATH_ZERO_DIV";
+        default:
+            return "UNKNOWN ERROR CODE"; /* never happens */
+    }
+    return "UNKNOWN ERROR CODE"; /* never happens */
+}
+
+static const char* cmd_name(int cmd)
 {
     switch (cmd)
     {
-        case MATH_IOCTL_NEG:
-            return math_neg(x[0], &(x[1]));
         case MATH_IOCTL_ADD:
-	    return math_add(x[0], x[1], &(x[2]));
+            return "MATH_IOCTL_ADD";
+        case MATH_IOCTL_NEG:
+            return "MATH_IOCTL_NEG";
         case MATH_IOCTL_DIV:
-	    return math_div(x[0], x[1], &(x[2]));
+            return "MATH_IOCTL_DIV";
         case MATH_IOCTL_EXP:
-	    return math_exp(x[0], x[1], &(x[2]));
+            return "MATH_IOCTL_EXP";
         case MATH_IOCTL_LOG:
-	    return math_log(x[0], x[1], &(x[2]));
+            return "MATH_IOCTL_LOG";
         default:
-            return MATH_BAD_CMD;
+            return "UNKNOWN IOCTL";
     }
+
+    return "UNKNOWN IOCTL"; /* never happens */
 }
-
-static long fop_unlocked_ioctl(struct file* fp, unsigned int cmd, unsigned long arg)
-{
-    int ret;
-    int x[3];
-    int* x_user = (int*) arg;
-    int len;
-
-    ret = arity(cmd, &len);
-    if (ret)
-    {
-        pr_err("math: unknown operation code\n");
-        return -EINVAL;
-    }
-
-    pr_info("math: requested operation %x (%s)\n", cmd, cmd_name(cmd));
-    ret = copy_from_user(x, x_user, len * sizeof(int));
-    ret = do_math(cmd, x);
-    if (ret)
-    {
-        pr_err("math: unable to compute requested mathematical operation\n");
-        pr_info("math: do_math returned error %s\n", math_err_name(ret));
-        return -EINVAL;
-    }
-    ret = copy_to_user(x_user + len, x + len, sizeof(int));
-
-    return 0;
-}
-
-static int math_init(void)
-{
-    int ret;
-
-    static struct file_operations fops =
-    {
-        .owner = THIS_MODULE,
-        .open = fop_open,
-        .release = fop_release,
-        .unlocked_ioctl = fop_unlocked_ioctl
-    };
-
-    math_device.max_users = 6;
-    atomic_set(&(math_device.user_count), 0);
-
-    ret = alloc_chrdev_region(&(math_device.num), 0, 1, "math");
-
-    if (ret < 0)
-    {
-        pr_err("math: failed to allocate device number\n");
-        return ret;
-    }
-
-    math_device.cdev = cdev_alloc();
-    if (math_device.cdev == NULL)
-    {
-        pr_err("math: failed to allocate a cdev\n");
-        unregister_chrdev_region(math_device.num, 1);
-        return -1;
-    }
-
-    cdev_init(math_device.cdev, &fops);
-    math_device.cdev->owner = THIS_MODULE;
-    ret = cdev_add(math_device.cdev, math_device.num, 1);
-    
-    if (ret < 0)
-    {
-        pr_err("math: unable to add character device\n");
-        return ret;
-    }
-
-
-    pr_info("math: loaded module\n");
-    return 0;
-}
-
-static void math_exit(void)
-{
-    cdev_del(math_device.cdev);
-    unregister_chrdev_region(math_device.num, 1);
-    pr_info("math: unloaded module\n");
-}
-
