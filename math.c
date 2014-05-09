@@ -151,6 +151,8 @@ static int math_init(void)
     if (ret < 0)
     {
         pr_err("math: unable to add character device\n");
+        cdev_del(math_device.cdev);
+        unregister_chrdev_region(math_device.num, 1);
         return ret;
     }
 
