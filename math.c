@@ -199,9 +199,10 @@ static long fop_unlocked_ioctl(
 {
     int ret;
     int x[3];
-    int* x_user = (int*) arg;
+    int __user* x_user;
     int len;
 
+    x_user = (int*) arg;
     ret = arity(cmd, &len);
     if (ret)
     {
@@ -210,7 +211,14 @@ static long fop_unlocked_ioctl(
     }
 
     pr_info("math: requested operation %x (%s)\n", cmd, cmd_name(cmd));
+
     ret = copy_from_user(x, x_user, len * sizeof(int));
+    if (ret)
+    {
+        pr_err("math: unable to copy %d bytes from userspace\n", ret);
+        return -EFAULT;
+    }
+
     ret = do_math(cmd, x);
     if (ret)
     {
@@ -218,7 +226,13 @@ static long fop_unlocked_ioctl(
         pr_info("math: do_math returned error %s\n", math_err_name(ret));
         return -EINVAL;
     }
+
     ret = copy_to_user(x_user + len, x + len, sizeof(int));
+    if (ret)
+    {
+        pr_err("math: unable to copy %d bytes to userspace\n", ret);
+        return -EFAULT;
+    }
 
     return 0;
 }
