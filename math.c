@@ -77,6 +77,19 @@ static int math_mul(int, int, int*);
 
 /*
  * Raises the first argument to the power of the second argument.
+ * Works only in special case (base < 0). Checks for overflow
+ * and bad second argument
+ */
+static int math_exp_negative_power(int, int, int*);
+
+/*
+ * Raises the first argument to the power of the second argument.
+ * Works only in special case (base > 0). Checks for overflow
+ */
+static int math_exp_positive_power(int, int, int*);
+
+/*
+ * Raises the first argument to the power of the second argument.
  * Works only in special case (base > 1, exp > 1). Checks for overflow
  */
 static int math_exp2(int, int, int*);
@@ -327,6 +340,100 @@ static int math_mul(int a, int b, int*c)
     return 0;
 }
 
+static int math_exp_negative_power(int a, int b, int* c)
+{
+    if (a < -1 || a > 1)
+    {
+        /* error: the result is less then 1 in absolute value, not int. */
+        return MATH_UNDERFLOW;
+    }
+
+    if (a == 0)
+    {
+        /* error: zero to negative power */
+        return MATH_BAD_EXP;
+    }
+
+    if (a == 1)
+    {
+        /* one to negative power is one */
+        *c = 1;
+        return 0;
+    }
+
+    /* case a == -1: */
+    /* if the power is odd, the res. is -1, otherwise the res. is 1 */
+    if (b % 2)
+    {
+        *c = -1;
+        return 0;
+    }
+    *c = 1;
+    return 0;
+}
+
+static int math_exp_positive_power(int a, int b, int* c)
+{
+    int ret;
+
+    if (b == 1)
+    {
+        /* the result equals the base */
+        *c = a;
+        return 0;
+    }
+
+    /* case b > 1: */
+
+    if (a > 1)
+    {
+        return math_exp2(a, b, c);
+    }
+
+    if (a == 0 || a == 1)
+    {
+        *c = a;
+        return 0;
+    }
+
+    if (a == -1)
+    {
+        /* if the power is odd, the res. is -1, otherwise the res. is 1 */
+        if (b % 2)
+        {
+            *c = -1;
+            return 0;
+        }
+        *c = 1;
+        return 0;
+    }
+
+    /* case a < -1: */
+    /*
+     * reduce it to case a > 1
+     * negate the base, then, if the power is odd, negate the result
+     */
+
+    if (a == INT_MIN)
+    {
+        return MATH_OVERFLOW;
+    }
+
+    ret = math_exp2(0 - a, b, c);
+
+    if (ret)
+    {
+        return ret;
+    }
+
+    if (b % 2)
+    {
+        *c = 0 - *c;
+    }
+
+    return 0;
+}
+
 /* a > 1, b > 1 */
 static int math_exp2(int a, int b, int* c)
 {
@@ -354,136 +461,27 @@ static int math_exp2(int a, int b, int* c)
 
 static int math_exp(int a, int b, int* c)
 {
-    int ret;
-    int case_a;
-    int case_b;
-
-    if (a < -1)
-      case_a = 0;
-    else if (a == -1)
-      case_a = 1;
-    else if (a == 0)
-      case_a = 2;
-    else if (a == 1)
-      case_a = 3;
-    else
-      case_a = 4;
-
     if (b < 0)
-      case_b = 0;
-    else if (b == 0)
-      case_b = 1;
-    else if (b == 1)
-      case_b = 2;
-    else
-      case_b = 3;
-
-    switch (case_b * 5 + case_a)
     {
-        /*********************************************************************/
-        /* case b < 0 (negative power): */
-        case 0:
-            /* case a < -1: */
-            /* error: the result is less then 1 in absolute value, not int. */
-            return MATH_UNDERFLOW;
-        case 1:
-            /* case a == -1: */
-            /* if the power is odd, the res. is -1, otherwise the res. is 1 */
-            if (b % 2)
-            {
-                *c = -1;
-                return 0;
-            }
-            *c = 1;
-            return 0;
-        case 2:
-            /* case a == 0: */
-            /* error: zero to negative power */
-            return MATH_BAD_EXP;
-        case 3:
-            /* case a == 1: */
-            /* one to negative power is one */
-            *c = 1;
-            return 0;
-        case 4:
-            /* case a > 1: */
-            /* error: the result is less then 1 in absolute value, not int. */
-            return MATH_UNDERFLOW;
-        /*********************************************************************/
-        /* case b == 0 (power zero): */
-        case 7:
-            /* case a == 0: */
-            /* error: zero to the power of zero */
-            return MATH_BAD_EXP;
-        case 5:
-        case 6:
-        case 8:
-        case 9:
-            /* case a != 0: */
-            /* non-zero to the power of zero */
-            *c = 1;
-            return 0;
-        /*********************************************************************/
-        /* case b == 1 (power one): */
-        /* the result equals the base */
-        case 10:
-        case 11:
-        case 12:
-        case 13:
-        case 14:
-            *c = a;
-            return 0;
-        /*********************************************************************/
-        /* case b > 1 (positive power greater than 1): */
-        case 15:
-            /* case a < -1: */
-            /*
-             * reduce it to case a > 1
-             * negate the base, then, if the power is odd, negate the result
-             */
-            if (a == INT_MIN)
-            {
-                return MATH_OVERFLOW;
-            }
-
-            ret = math_exp2(0 - a, b, c);
-
-            if (ret)
-            {
-                return ret;
-            }
-
-            if (b % 2)
-            {
-                *c = 0 - *c;
-            }
-
-            return 0;
-        case 16:
-            /* case a == -1: */
-            /* if the power is odd, the res. is -1, otherwise the res. is 1 */
-            if (b % 2)
-            {
-                *c = -1;
-                return 0;
-            }
-            *c = 1;
-            return 0;
-        case 17:
-        case 18:
-            /* case a == 0 or a == 1: */
-            /* zero or one to the positive power stays the same */
-            *c = a;
-            return 0;
-        case 19:
-            /* case a > 1: */
-            return math_exp2(a, b, c);
-        /*********************************************************************/
-        default:
-            return MATH_BAD_EXP; /* never happens */
+        return math_exp_negative_power(a, b, c);
     }
 
-    return MATH_BAD_EXP; /* never happens */
+    if (b > 0)
+    {
+        return math_exp_positive_power(a, b, c);
+    }
+
+    // case b == 0:
+    if (a == 0)
+    {
+        /* error: zero to the power of zero */
+        return MATH_BAD_EXP;
+    }
+
+    /* case a != 0: */
+    /* non-zero to the power of zero */
+    *c = 1;
+    return 0;
 }
 
 static int math_log(int a, int b, int* c)
