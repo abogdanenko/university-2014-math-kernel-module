@@ -123,6 +123,39 @@ int main(int argc, char *argv[])
     try_ioctl_2(fd, MATH_IOCTL_EXP, 2, 1000000, 0, 0);
 
     try_ioctl_2(fd, MATH_IOCTL_LOG, 4, 2, 1, 2);
+
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 1, 2, 1, 0);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 1, 3, 1, 0);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 1, 4, 1, 0);
+
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 2, 2, 1, 1);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 2, 3, 1, 0);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 2, 4, 1, 0);
+
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 4, 2, 1, 2);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 4, 3, 1, 1);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 4, 4, 1, 1);
+
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 9, 2, 1, 3);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 9, 3, 1, 2);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 9, 4, 1, 1);
+
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 15, 4, 1, 1);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, 16, 4, 1, 2);
+
+    try_ioctl_2(fd, MATH_IOCTL_LOG, INT_MAX - 1, INT_MAX, 1, 0);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, INT_MAX, 1, 0, 0);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, INT_MAX, INT_MAX, 1, 1);
+    try_ioctl_2(fd, MATH_IOCTL_LOG, INT_MAX, INT_MAX - 1, 1, 1);
+
+    /*
+       let n be the number of bits in type int
+     * INT_MAX == 2 ** (n - 1) - 1  (one bit is to store the sign)
+     * then log2(INT_MAX) == n - 2
+     */
+
+    try_ioctl_2(fd, MATH_IOCTL_LOG, INT_MAX, 2, 1, sizeof(int) * 8 - 2);
+
     try_ioctl_2(fd, MATH_IOCTL_LOG, 3, 3, 1, 1);
     /* overflow */
     try_ioctl_2(fd, MATH_IOCTL_LOG, 0, 0, 0, 0);
